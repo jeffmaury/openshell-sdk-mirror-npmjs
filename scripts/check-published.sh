@@ -31,20 +31,24 @@ VERSION="$1"
 echo "Checking if ${PACKAGE}@${VERSION} exists on ${REGISTRY}..." >&2
 
 set +e
-OUTPUT=$(npm view "${PACKAGE}@${VERSION}" version --registry="${REGISTRY}" 2>&1)
+NPM_STDERR=$(mktemp)
+OUTPUT=$(npm view "${PACKAGE}@${VERSION}" version --registry="${REGISTRY}" 2>"${NPM_STDERR}")
 EXIT_CODE=$?
 set -e
 
 if [ ${EXIT_CODE} -eq 0 ] && [ "${OUTPUT}" = "${VERSION}" ]; then
+  rm -f "${NPM_STDERR}"
   echo "${PACKAGE}@${VERSION} is already published." >&2
   exit 0
 fi
 
-if echo "${OUTPUT}" | grep -qE "(E404|404 Not Found|is not in this registry)"; then
+if grep -qE "(E404|404 Not Found|is not in this registry)" "${NPM_STDERR}"; then
+  rm -f "${NPM_STDERR}"
   echo "${PACKAGE}@${VERSION} is not published." >&2
   exit 1
 fi
 
 echo "Unexpected error checking ${PACKAGE}@${VERSION}:" >&2
-echo "${OUTPUT}" >&2
+cat "${NPM_STDERR}" >&2
+rm -f "${NPM_STDERR}"
 exit 2
